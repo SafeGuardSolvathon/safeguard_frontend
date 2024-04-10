@@ -2,6 +2,7 @@ import 'dart:ffi';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,6 +12,24 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Future<void> _checkUserLoggedIn() async {
+    // Check if user details are stored in SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    bool isLoggedIn = prefs.containsKey('empId');
+
+    // Navigate to the appropriate screen based on whether user is logged in or not
+    isLoggedIn
+        ? Navigator.pushReplacementNamed(context, '/')
+        : null; //  // Replace '/login' with your login screen route
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    _checkUserLoggedIn();
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

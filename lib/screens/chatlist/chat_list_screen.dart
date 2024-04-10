@@ -1,5 +1,7 @@
+
 import 'package:flutter/material.dart';
 import 'package:safeguard/screens/chatlist/user_model.dart';
+
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -28,12 +30,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
         Navigator.pushNamed(context, "/pda");
         break;
       case 3:
-         Navigator.pushNamed(context, "/chatlist");
+        Navigator.pushNamed(context, "/chatlist");
         break;
       default:
         break;
     }
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +71,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   Navigator.pushNamed(context, "/busstatus");
                 },
               ),
-              
             ],
           ),
         ),

@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -12,9 +16,40 @@ class _SignUpScreenState extends State<SignUpScreen> {
   TextEditingController employeeIdController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
   TextEditingController fullNameController = TextEditingController();
-  
 
   bool isSecure = true;
+
+  Future<void> handleSignUp() async {
+    final url = "http://10.0.2.2:8000/users/";
+    final Map<String, dynamic> userData = {
+      'username': fullNameController.text,
+      'password': passwordController.text,
+      'empid': employeeIdController.text
+      // Add more fields as required by your backend
+    };
+    final response = await http.post(Uri.parse(url),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(userData));
+    if (response.statusCode == 201) {
+      // Successfully signed up
+      final Map<String, dynamic> responseData = json.decode(response.body);
+      final userDetails = responseData['details'];
+
+      // Store user details in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      prefs.setString('empId', userDetails['empId']);
+      prefs.setString('fullName', userDetails['fullName']);
+      Navigator.pushNamed(context, "/");
+      // Navigate to the next screen or perform any desired action
+    } else {
+      // Failed to sign up
+      final Map<String, dynamic> errorData = json.decode(response.body);
+      final errorMessage = errorData['error'];
+      // Display error message to the user
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +171,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       obscureText: isSecure,
                       controller: passwordController,
                       style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w400, 
+                          fontWeight: FontWeight.w400,
                           fontSize: 15,
                           color: Colors.black),
                       decoration: InputDecoration(
@@ -167,7 +202,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       child: MaterialButton(
                         onPressed: () {
-                          Navigator.pushNamed(context,"/");
+                          handleSignUp();
                         },
                         child: Center(
                             child: Text(

@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,9 +15,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  Position? _currentPosition;
 
   int touchedIndex = -1;
-   
+
   List<PieChartSectionData> showingSections() {
     return List.generate(2, (i) {
       final isTouched = i == touchedIndex;
@@ -53,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
   }
+
   void navigate(int index) {
     switch (index) {
       case 0:
@@ -65,11 +71,68 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.pushNamed(context, "/pda");
         break;
       case 3:
-         Navigator.pushNamed(context, "/chatlist");
+        Navigator.pushNamed(context, "/chatlist");
         break;
       default:
         break;
     }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse &&
+            permission != LocationPermission.always) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Location Permission Required'),
+              content: const Text(
+                  'Please grant permission to access your location.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+      }
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      setState(() {
+        _currentPosition = position;
+      });
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content: const Text('Failed to retrieve location.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
   }
 
   @override
@@ -88,25 +151,45 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       drawer: Drawer(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: <Widget>[
-              DrawerHeader(
-                child: Text('Menu'),
-                decoration: BoxDecoration(
-                  color: Colors.blue,
-                ),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            DrawerHeader(
+              child: Text('Menu'),
+              decoration: BoxDecoration(
+                color: Colors.blue,
               ),
-              ListTile(
-                title: Text('Bus Status'),
-                onTap: () {
-                  Navigator.pushNamed(context, "/busstatus");
-                },
-              ),
-              
-            ],
-          ),
+            ),
+            ListTile(
+              title: Text('Bus Status'),
+              onTap: () {
+                Navigator.pushNamed(context, "/busstatus");
+              },
+            ),
+            ListTile(
+              title: Text('Action'),
+              onTap: () {
+                Navigator.pushNamed(context, "/action");
+              },
+            ),
+            ListTile(
+              title: Text('Notes'),
+              onTap: () {
+                Navigator.pushNamed(context, "/notes");
+              },
+            ),
+            ListTile(
+              title: Text("Logout"),
+              onTap: () async {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                Navigator.pushNamedAndRemoveUntil(
+                    context, "/splash", (route) => false);
+              },
+            ),
+          ],
         ),
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -117,23 +200,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.all(5),
                 margin: EdgeInsets.only(bottom: 10),
                 decoration: BoxDecoration(
-                  color: Colors.red[100],
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(width: 1, color: Colors.red)
-                ),
+                    color: Colors.red[100],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(width: 1, color: Colors.red)),
                 child: Row(
                   children: [
                     Icon(
                       Icons.dangerous_outlined,
                       color: Colors.red,
                     ),
-                    SizedBox(width: 10,),
+                    SizedBox(
+                      width: 10,
+                    ),
                     Expanded(
-                      child: Text("You are away from your allocated location...",
-                        
-                        style: GoogleFonts.poppins(
-                          color: Colors.red
-                        ),
+                      child: Text(
+                       "You are quite away from your allocated location",
+                        style: GoogleFonts.poppins(color: Colors.red),
                       ),
                     )
                   ],
@@ -173,31 +255,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               AspectRatio(
-              aspectRatio: 1,
-              child: PieChart(
-                PieChartData(
-                  pieTouchData: PieTouchData(
-                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                      setState(() {
-                        if (!event.isInterestedForInteractions ||
-                            pieTouchResponse == null ||
-                            pieTouchResponse.touchedSection == null) {
-                          touchedIndex = -1;
-                          return;
-                        }
-                        touchedIndex = pieTouchResponse
-                            .touchedSection!.touchedSectionIndex;
-                      });
-                    },
+                aspectRatio: 1,
+                child: PieChart(
+                  PieChartData(
+                    pieTouchData: PieTouchData(
+                      touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                        setState(() {
+                          if (!event.isInterestedForInteractions ||
+                              pieTouchResponse == null ||
+                              pieTouchResponse.touchedSection == null) {
+                            touchedIndex = -1;
+                            return;
+                          }
+                          touchedIndex = pieTouchResponse
+                              .touchedSection!.touchedSectionIndex;
+                        });
+                      },
+                    ),
+                    borderData: FlBorderData(
+                      show: false,
+                    ),
+                    sectionsSpace: 0,
+                    centerSpaceRadius: 40,
+                    sections: showingSections(),
                   ),
-                  borderData: FlBorderData(
-                    show: false,
-                  ),
-                  sectionsSpace: 0,
-                  centerSpaceRadius: 40,
-                  sections: showingSections(),
                 ),
-              ),
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -210,13 +292,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           width: 20,
                           color: Colors.green,
                         ),
-                        SizedBox(width: 5,),
-                        Text("In Location",
+                        SizedBox(
+                          width: 5,
+                        ),
+                        Text(
+                          "In Location",
                           style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
-                            color: Colors.black
-                          ),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
+                              color: Colors.black),
                         )
                       ],
                     ),
@@ -229,25 +313,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           width: 20,
                           color: Colors.red,
                         ),
-                        SizedBox(width: 5,),
-                        Text("Not In Location",
+                        SizedBox(
+                          width: 5,
+                        ),
+                        Text(
+                          "Not In Location",
                           style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
-                            color: Colors.black
-                          ),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
+                              color: Colors.black),
                         )
                       ],
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 25,),
-              Text("Your Shift : 7:00 AM - 8:00 PM",
+              SizedBox(
+                height: 25,
+              ),
+              Text(
+                "Your Shift : 7:00 AM - 8:00 PM",
                 style: GoogleFonts.poppins(
                   color: Colors.black,
                   fontSize: 16,
-
                 ),
               )
             ],
@@ -255,29 +343,29 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: const Color(0xFFD4E4F7),
-          currentIndex: 0,
-          type: BottomNavigationBarType.fixed,
-          onTap: (value) => navigate(value),
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.emergency),
-              label: 'Emergency',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.local_police),
-              label: 'PDA',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat),
-              label: 'Chat',
-            ),
-          ],
-        ),
+        backgroundColor: const Color(0xFFD4E4F7),
+        currentIndex: 0,
+        type: BottomNavigationBarType.fixed,
+        onTap: (value) => navigate(value),
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.emergency),
+            label: 'Emergency',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.local_police),
+            label: 'PDA',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat),
+            label: 'Chat',
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,6 +14,55 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   TextEditingController employeeIdController = TextEditingController();
   TextEditingController passwordController = TextEditingController();
+
+  Future<void> loginUser() async {
+    // Define the API endpoint URL
+    final String apiUrl = 'http://10.0.2.2:8000/login/';
+
+    try {
+      // Send a POST request to the backend endpoint
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        body: jsonEncode({
+          'empid': employeeIdController.text,
+          'password': passwordController.text
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      // Check if the response is successful (status code 200)
+      if (response.statusCode == 200) {
+        // Parse the response JSON data
+        final responseData = jsonDecode(response.body);
+
+        // Check if the login was successful
+        if (responseData['success'] == true) {
+          // Extract user details from the response
+          final userDetails = responseData['details'];
+
+          // Store user details in SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          prefs.setString('empId', userDetails['empid']);
+          prefs.setString('fullName', userDetails['username']);
+          Navigator.pushNamed(context, "/");
+          // TODO: Handle user authentication and navigation based on the response
+          // For example, you can store user details in local storage and navigate to the home screen
+        } else {
+          // Handle unsuccessful login (invalid credentials)
+          // For example, show an error message to the user
+          print('Invalid username or password');
+        }
+      } else {
+        // Handle other HTTP status codes (e.g., server error)
+        // For example, show an error message to the user
+        print('Failed to login: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Handle network errors or other exceptions
+      // For example, show an error message to the user
+      print('Error: $e');
+    }
+  }
 
   bool isSecure = true;
   @override
@@ -136,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: MaterialButton(
                         onPressed: () {
-                          Navigator.pushNamed(context,"/");
+                          loginUser();
                         },
                         child: Center(
                             child: Text(

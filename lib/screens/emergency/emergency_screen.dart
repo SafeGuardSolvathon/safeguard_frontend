@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EmergencyScreen extends StatefulWidget {
@@ -69,7 +70,27 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                   Navigator.pushNamed(context, "/busstatus");
                 },
               ),
-              
+              ListTile(
+              title: Text('Action'),
+              onTap: () {
+                Navigator.pushNamed(context, "/action");
+              },
+            ),
+            ListTile(
+              title: Text('Notes'),
+              onTap: () {
+                Navigator.pushNamed(context, "/notes");
+              },
+            ),
+            ListTile(
+              title: Text("Logout"),
+              onTap: () async {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                Navigator.pushNamedAndRemoveUntil(
+                    context, "/splash", (route) => false);
+              },
+            ),
             ],
           ),
         ),

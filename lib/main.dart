@@ -6,6 +6,7 @@ import 'package:safeguard/screens/chatlist/chat_list_screen.dart';
 import 'package:safeguard/screens/emergency/emergency_screen.dart';
 import 'package:safeguard/screens/home/home_screen.dart';
 import 'package:safeguard/screens/login/login_screen.dart';
+import 'package:safeguard/screens/notes/notes_screen.dart';
 import 'package:safeguard/screens/pda/pda_screen.dart';
 import 'package:safeguard/screens/signup/signup_screen.dart';
 import 'package:safeguard/screens/splash/splash_screen.dart';
@@ -35,9 +36,10 @@ class MyApp extends StatelessWidget {
         "/splash" : (context) => const SplashScreen(),
         "/pda" : (context) => const PDAScreen(),
         "/action": (context) => const ActionScreen(),
-        "/chatlist": (context) => const ChatListScreen(),
+        "/chatlist": (context) => const ChatScreen(),
         "/chat": (context) => const ChatScreen(),
-        "/busstatus": (context) => const BusStatusScreen()
+        "/busstatus": (context) => const BusStatusScreen(),
+        "/notes" : (context) => NotesScreen()
       },
       initialRoute: "/splash",
     );

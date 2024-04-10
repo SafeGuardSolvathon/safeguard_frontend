@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:safeguard/screens/chat/chat_model.dart';
 import 'package:safeguard/screens/chatlist/user_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -15,21 +19,35 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   TextEditingController inputController = TextEditingController();
   UserModel user = UserModel(fullName: "Aswin Raaj", uid: 1);
-  String selectedLanguage = 'English'; // Initialize with default language
+  String selectedLanguage = 'English';
+  String empId = ""; // Initialize with default language
 
-  List<ChatModel> chatList = [
-    ChatModel(isUser: true, message: "Hi"),
-    ChatModel(isUser: false, message: "Hellow"),
-    ChatModel(isUser: true, message: "How's it's going")
-  ];
+  List<Chat> chatList = [];
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    getEmpId();
+    super.initState();
+  }
+
+  Future<void> getEmpId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    var e = await prefs.getString("empId");
+    setState(() {
+      empId = e!;
+    });
+    await getAllChats();
+  }
 
   void addText() {
     if (inputController.text != '') {
+      addChat(inputController.text);
       setState(() {
-        chatList.add(ChatModel(
-          isUser: true,
-          message: inputController.text,
-        ));
+        chatList.add(Chat(
+            empId: empId,
+            description: inputController.text,
+            time: DateTime.now().toString()));
       });
       inputController.text = '';
       _scrollController.animateTo(
@@ -40,13 +58,118 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> getAllChats() async {
+    final response =
+        await http.get(Uri.parse('http://10.0.2.2:8000/complain/'));
+    if (response.statusCode == 200) {
+      // If the server returns a 200 OK response, parse the JSON
+      final List<dynamic> jsonData = json.decode(response.body);
+      // Map the JSON data to a list of Chat objects
+      var li = jsonData.map((json) => Chat.fromJson(json)).toList();
+      setState(() {
+        chatList = li;
+      });
+    } else {
+      // If the server did not return a 200 OK response, throw an exception
+      throw Exception('Failed to load chats');
+    }
+  }
+
+  Future<void> addChat(String msg) async {
+    final response = await http.post(
+      Uri.parse('http://10.0.2.2:8000/complain/'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: jsonEncode(<String, dynamic>{
+        'empid': empId,
+        'description': msg,
+        'time': DateTime.now().toString(),
+      }),
+    );
+    if (response.statusCode == 201) {
+      // If the server returns a 201 Created response, the chat was added successfully
+      print('Chat added successfully');
+    } else {
+      // If the server did not return a 201 Created response, throw an exception
+      throw Exception('Failed to add chat');
+    }
+  }
+
+  Future<String> callGemini(String text, String language) async {
+    final apiKey = "AIzaSyBc9DJ0jSt6ojoAciC9OnEp1DQ_apOvGUc";
+    final model = GenerativeModel(model: 'gemini-pro', apiKey: apiKey);
+    final content = [Content.text('Translate $text into $language')];
+    final response = await model.generateContent(content);
+    print(response.text!);
+    return response.text!;
+  }
+
+  Future<void> translate(String language) async {
+    print("Hi");
+    List<Chat> tempList =  [...chatList];
+    tempList.forEach((element) async {
+      element.description = await callGemini(element.description, language);
+    });
+    setState(() {
+      chatList = tempList;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFD4E4F7),
+      key: _scaffoldKey,
       appBar: AppBar(
         backgroundColor: const Color(0xFFD4E4F7),
-        title: Text(user.fullName),
+        title: Text('SafeGuard'),
+        leading: IconButton(
+          icon: Icon(Icons.menu),
+          onPressed: () {
+            _scaffoldKey.currentState!.openDrawer();
+          },
+        ),
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            DrawerHeader(
+              child: Text('Menu'),
+              decoration: BoxDecoration(
+                color: Colors.blue,
+              ),
+            ),
+            ListTile(
+              title: Text('Bus Status'),
+              onTap: () {
+                Navigator.pushNamed(context, "/busstatus");
+              },
+            ),
+            ListTile(
+              title: Text('Action'),
+              onTap: () {
+                Navigator.pushNamed(context, "/action");
+              },
+            ),
+            ListTile(
+              title: Text('Notes'),
+              onTap: () {
+                Navigator.pushNamed(context, "/notes");
+              },
+            ),
+            ListTile(
+              title: Text("Logout"),
+              onTap: () async {
+                SharedPreferences prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                Navigator.pushNamedAndRemoveUntil(
+                    context, "/splash", (route) => false);
+              },
+            ),
+          ],
+        ),
       ),
       body: Container(
         padding: EdgeInsets.symmetric(horizontal: 10),
@@ -63,9 +186,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       selectedLanguage = newValue!;
                     });
                   },
-                  items: <String>['English', 'Spanish', 'French', 'German']
-                      .map<DropdownMenuItem<String>>((String value) {
+                  items: <String>[
+                    'English',
+                    'Hindi',
+                  ].map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
+                      onTap: () => translate(value),
                       value: value,
                       child: Text(value),
                     );
@@ -79,13 +205,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 controller: _scrollController,
                 itemCount: chatList.length,
                 itemBuilder: (BuildContext context, int index) {
-                  ChatModel message = chatList[index];
+                  Chat message = chatList[index];
                   return Align(
-                    alignment: (message.isUser)
+                    alignment: (message.empId == empId)
                         ? Alignment.topRight
                         : Alignment.topLeft,
                     child: Column(
-                      crossAxisAlignment: (message.isUser)
+                      crossAxisAlignment: (message.empId == empId)
                           ? CrossAxisAlignment.end
                           : CrossAxisAlignment.start,
                       children: [
@@ -94,19 +220,19 @@ class _ChatScreenState extends State<ChatScreen> {
                           padding: const EdgeInsets.all(10),
                           constraints: BoxConstraints(maxWidth: 300),
                           decoration: BoxDecoration(
-                            color: (message.isUser)
-                                ? const Color(0xFF59718F)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: (message.isUser)
-                                ? null
-                                : Border.all(
-                                    width: 2,
-                                    color: const Color(0xFF59718F))),
+                              color: (message.empId == empId)
+                                  ? const Color(0xFF59718F)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: (message.empId == empId)
+                                  ? null
+                                  : Border.all(
+                                      width: 2,
+                                      color: const Color(0xFF59718F))),
                           child: Text(
-                            message.message,
+                            message.description,
                             style: GoogleFonts.poppins(
-                                color: (message.isUser)
+                                color: (message.empId == empId)
                                     ? Colors.white
                                     : Colors.black,
                                 fontSize: 14,
@@ -161,6 +287,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: () {
                       // Send button pressed...
                       addText();
+
                       FocusScope.of(context).unfocus();
                     },
                     icon: Icon(
